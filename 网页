@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧大棚控制系统</title>
+    <style>
+        :root {
+            --bg-primary: #0a1a12;
+            --bg-secondary: #102018;
+            --bg-card: rgba(22, 41, 31, 0.85);
+            --bg-card-hover: rgba(30, 52, 40, 0.9);
+            --accent-green: #4ade80;
+            --accent-green-dim: #22c55e;
+            --accent-blue: #38bdf8;
+            --accent-orange: #fb923c;
+            --accent-yellow: #facc15;
+            --accent-red: #f87171;
+            --text-primary: #e8f5e9;
+            --text-secondary: #81a89a;
+            --text-muted: #4a6b5b;
+            --border: rgba(74, 222, 128, 0.12);
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+            background-image:
+                radial-gradient(ellipse at 20% 10%, rgba(34, 197, 94, 0.06), transparent 40%),
+                radial-gradient(ellipse at 80% 90%, rgba(56, 189, 248, 0.04), transparent 40%);
+        }
+
+        .desktop {
+            display: grid;
+            grid-template-rows: 60px 1fr 72px 36px;
+            height: 100vh;
+        }
+
+        /* ====== 顶部导航栏 ====== */
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 28px;
+            background: rgba(10, 26, 18, 0.95);
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(12px);
+        }
+
+        .topbar-left { display: flex; align-items: center; gap: 16px; }
+
+        .logo { display: flex; align-items: center; gap: 10px; }
+
+        .logo-icon {
+            width: 34px; height: 34px; border-radius: 9px;
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 0 12px rgba(74, 222, 128, 0.3);
+        }
+
+        .logo-text { font-size: 17px; font-weight: 700; letter-spacing: 0.5px; }
+        .logo-sub { font-size: 10px; color: var(--text-muted); letter-spacing: 2px; }
+
+        .topbar-right { display: flex; align-items: center; gap: 16px; }
+
+        .status-pill {
+            display: flex; align-items: center; gap: 8px;
+            padding: 5px 14px; border-radius: 20px;
+            background: rgba(74, 222, 128, 0.08);
+            border: 1px solid rgba(74, 222, 128, 0.2);
+            font-size: 12px;
+        }
+
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        .clock { font-size: 13px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+        /* ====== 自动/手动开关 ====== */
+        .mode-switch-wrapper {
+            display: flex; align-items: center; gap: 12px;
+        }
+
+        .mode-label {
+            font-size: 13px; color: var(--text-secondary);
+            transition: color 0.3s;
+        }
+
+        .mode-label.active { color: var(--text-primary); font-weight: 600; }
+
+        .mode-switch {
+            position: relative;
+            width: 64px; height: 32px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 2px solid var(--border);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .mode-switch.auto {
+            background: rgba(74, 222, 128, 0.15);
+            border-color: var(--accent-green);
+            box-shadow: 0 0 12px rgba(74, 222, 128, 0.2);
+        }
+
+        .mode-switch.manual {
+            background: rgba(251, 146, 60, 0.15);
+            border-color: var(--accent-orange);
+            box-shadow: 0 0 12px rgba(251, 146, 60, 0.2);
+        }
+
+        .mode-knob {
+            position: absolute;
+            top: 2px; left: 2px;
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px;
+        }
+
+        .mode-switch.auto .mode-knob {
+            left: 34px;
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+        }
+
+        .mode-switch.manual .mode-knob {
+            left: 2px;
+            background: var(--accent-orange);
+            box-shadow: 0 0 8px var(--accent-orange);
+        }
+
+        /* ====== 主内容区 ====== */
+        .main {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 40px;
+            gap: 28px;
+            overflow: hidden;
+        }
+
+        /* ====== 三大核心数据圆 ====== */
+        .gauge-row {
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .gauge-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            transition: transform 0.3s ease;
+        }
+
+        .gauge-card:hover { transform: translateY(-3px); }
+
+        .gauge-circle {
+            width: 180px; height: 180px;
+            border-radius: 50%;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            position: relative;
+            transition: all 0.5s ease;
+            border: 3px solid;
+        }
+
+        .gauge-circle::before {
+            content: '';
+            position: absolute;
+            inset: -6px;
+            border-radius: 50%;
+            opacity: 0.15;
+            transition: all 0.5s ease;
+        }
+
+        /* 正常 - 绿色 */
+        .gauge-normal {
+            border-color: var(--accent-green);
+            box-shadow: 0 0 24px rgba(74, 222, 128, 0.2), inset 0 0 20px rgba(74, 222, 128, 0.05);
+        }
+        .gauge-normal::before { background: var(--accent-green); }
+        .gauge-normal .gauge-icon { color: var(--accent-green); }
+
+        /* 警告 - 黄色 */
+        .gauge-warning {
+            border-color: var(--accent-yellow);
+            box-shadow: 0 0 24px rgba(250, 204, 21, 0.2), inset 0 0 20px rgba(250, 204, 21, 0.05);
+            animation: warnPulse 1.5s ease-in-out infinite;
+        }
+        .gauge-warning::before { background: var(--accent-yellow); }
+        .gauge-warning .gauge-icon { color: var(--accent-yellow); }
+
+        @keyframes warnPulse {
+            0%, 100% { box-shadow: 0 0 24px rgba(250, 204, 21, 0.2), inset 0 0 20px rgba(250, 204, 21, 0.05); }
+            50% { box-shadow: 0 0 36px rgba(250, 204, 21, 0.35), inset 0 0 20px rgba(250, 204, 21, 0.08); }
+        }
+
+        /* 危险 - 红色 */
+        .gauge-danger {
+            border-color: var(--accent-red);
+            box-shadow: 0 0 28px rgba(248, 113, 113, 0.3), inset 0 0 20px rgba(248, 113, 113, 0.05);
+            animation: dangerPulse 1s ease-in-out infinite;
+        }
+        .gauge-danger::before { background: var(--accent-red); }
+        .gauge-danger .gauge-icon { color: var(--accent-red); }
+
+        @keyframes dangerPulse {
+            0%, 100% { box-shadow: 0 0 28px rgba(248, 113, 113, 0.3), inset 0 0 20px rgba(248, 113, 113, 0.05); }
+            50% { box-shadow: 0 0 44px rgba(248, 113, 113, 0.5), inset 0 0 20px rgba(248, 113, 113, 0.1); }
+        }
+
+        .gauge-icon {
+            font-size: 28px;
+            margin-bottom: 2px;
+        }
+
+        .gauge-value {
+            font-size: 42px;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+        }
+
+        .gauge-unit {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .gauge-label {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .gauge-status {
+            font-size: 12px;
+            padding: 3px 12px;
+            border-radius: 12px;
+        }
+
+        .status-normal { background: rgba(74, 222, 128, 0.15); color: var(--accent-green); }
+        .status-warning { background: rgba(250, 204, 21, 0.15); color: var(--accent-yellow); }
+        .status-danger { background: rgba(248, 113, 113, 0.15); color: var(--accent-red); }
+
+        /* ====== 当前作物信息 ====== */
+        .crop-info-bar {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            padding: 12px 28px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 13px;
+        }
+
+        .crop-info-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-secondary);
+        }
+
+        .crop-info-item strong { color: var(--text-primary); }
+        .crop-divider { width: 1px; height: 16px; background: var(--border); }
+
+        /* ====== 手动控制区 ====== */
+        .manual-controls {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .manual-control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .manual-control-group.disabled {
+            opacity: 0.35;
+            pointer-events: none;
+        }
+
+        .manual-control-group.enabled {
+            border-color: rgba(74, 222, 128, 0.3);
+            box-shadow: 0 0 12px rgba(74, 222, 128, 0.08);
+        }
+
+        .manual-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .manual-btn {
+            padding: 8px 18px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.04);
+            color: var(--text-primary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .manual-btn:hover {
+            background: rgba(74, 222, 128, 0.1);
+            border-color: rgba(74, 222, 128, 0.3);
+        }
+
+        .manual-btn.active {
+            background: rgba(74, 222, 128, 0.15);
+            border-color: var(--accent-green);
+            color: var(--accent-green);
+        }
+
+        /* ====== 语音播报区 ====== */
+        .voice-panel {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        .voice-icon {
+            font-size: 18px;
+            color: var(--accent-green);
+        }
+
+        .voice-icon.speaking {
+            animation: voiceWave 0.6s ease-in-out infinite;
+        }
+
+        @keyframes voiceWave {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+
+        .voice-text {
+            font-size: 13px;
+            color: var(--text-secondary);
+            flex: 1;
+        }
+
+        .voice-text .latest { color: var(--text-primary); }
+
+        /* ====== 底部作物选择栏 ====== */
+        .crop-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 0 28px;
+            background: rgba(10, 26, 18, 0.95);
+            border-top: 1px solid var(--border);
+        }
+
+        .crop-bar-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-right: 8px;
+            white-space: nowrap;
+        }
+
+        .crop-icon-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            padding: 8px 18px;
+            border-radius: 12px;
+            border: 2px solid transparent;
+            background: rgba(255,255,255,0.02);
+            cursor: pointer;
+            transition: all 0.25s ease;
+            min-width: 80px;
+        }
+
+        .crop-icon-btn:hover {
+            background: rgba(74, 222, 128, 0.06);
+            transform: translateY(-2px);
+        }
+
+        .crop-icon-btn.active {
+            background: rgba(74, 222, 128, 0.12);
+            border-color: var(--accent-green);
+            box-shadow: 0 0 12px rgba(74, 222, 128, 0.15);
+        }
+
+        .crop-emoji { font-size: 26px; }
+        .crop-name { font-size: 12px; color: var(--text-secondary); }
+        .crop-icon-btn.active .crop-name { color: var(--accent-green); font-weight: 600; }
+
+        /* ====== 底部状态栏 ====== */
+        .statusbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            background: rgba(10, 26, 18, 0.98);
+            border-top: 1px solid var(--border);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .statusbar-left { display: flex; gap: 18px; }
+        .statusbar-item { display: flex; align-items: center; gap: 4px; }
+
+        /* 自动模式指示 */
+        .auto-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .auto-indicator.auto-mode {
+            background: rgba(74, 222, 128, 0.12);
+            color: var(--accent-green);
+        }
+
+        .auto-indicator.manual-mode {
+            background: rgba(251, 146, 60, 0.12);
+            color: var(--accent-orange);
+        }
+
+        .auto-indicator-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .auto-mode .auto-indicator-dot { background: var(--accent-green); }
+        .manual-mode .auto-indicator-dot { background: var(--accent-orange); }
+
+        /* Toast 通知 */
+        .toast {
+            position: fixed;
+            top: 80px;
+            right: 24px;
+            padding: 14px 20px;
+            border-radius: 10px;
+            background: rgba(22, 41, 31, 0.95);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            z-index: 1000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            max-width: 380px;
+        }
+
+        .toast.show { transform: translateX(0); }
+        .toast-success { border-color: var(--accent-green); }
+        .toast-warn { border-color: var(--accent-yellow); }
+        .toast-danger { border-color: var(--accent-red); }
+    </style>
+</head>
+<body>
+    <div class="desktop">
+        <!-- ====== 顶部导航栏 ====== -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <div class="logo">
+                    <div class="logo-icon">🌿</div>
+                    <div>
+                        <div class="logo-text">智慧大棚控制系统</div>
+                        <div class="logo-sub">SMART GREENHOUSE</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 自动/手动开关 -->
+            <div class="mode-switch-wrapper">
+                <span class="mode-label" id="labelManual">手动</span>
+                <div class="mode-switch auto" id="modeSwitch" onclick="toggleMode()">
+                    <div class="mode-knob" id="modeKnob"></div>
+                </div>
+                <span class="mode-label active" id="labelAuto">自动</span>
+            </div>
+
+            <div class="topbar-right">
+                <div class="status-pill">
+                    <div class="status-dot"></div>
+                    <span>系统运行中</span>
+                </div>
+                <div class="clock" id="clock">--:--:--</div>
+            </div>
+        </header>
+
+        <!-- ====== 主内容区 ====== -->
+        <div class="main">
+            <!-- 三大核心数据圆 -->
+            <div class="gauge-row">
+                <!-- 温度 -->
+                <div class="gauge-card">
+                    <div class="gauge-circle gauge-normal" id="tempGauge">
+                        <span class="gauge-icon">🌡️</span>
+                        <span class="gauge-value" id="tempValue">26.4</span>
+                        <span class="gauge-unit">°C</span>
+                    </div>
+                    <span class="gauge-label">温度</span>
+                    <span class="gauge-status status-normal" id="tempStatus">正常</span>
+                </div>
+
+                <!-- 湿度 -->
+                <div class="gauge-card">
+                    <div class="gauge-circle gauge-normal" id="humidityGauge">
+                        <span class="gauge-icon">💧</span>
+                        <span class="gauge-value" id="humidityValue">68.2</span>
+                        <span class="gauge-unit">%RH</span>
+                    </div>
+                    <span class="gauge-label">湿度</span>
+                    <span class="gauge-status status-normal" id="humidityStatus">正常</span>
+                </div>
+
+                <!-- 土壤水分 -->
+                <div class="gauge-card">
+                    <div class="gauge-circle gauge-normal" id="soilGauge">
+                        <span class="gauge-icon">🌱</span>
+                        <span class="gauge-value" id="soilValue">52.0</span>
+                        <span class="gauge-unit">%</span>
+                    </div>
+                    <span class="gauge-label">土壤水分</span>
+                    <span class="gauge-status status-normal" id="soilStatus">正常</span>
+                </div>
+            </div>
+
+            <!-- 当前作物信息 -->
+            <div class="crop-info-bar">
+                <div class="crop-info-item">
+                    <span>当前作物:</span>
+                    <strong id="currentCropName">番茄 🍅</strong>
+                </div>
+                <div class="crop-divider"></div>
+                <div class="crop-info-item">
+                    <span>适宜温度:</span>
+                    <strong id="rangeTemp">20~30°C</strong>
+                </div>
+                <div class="crop-divider"></div>
+                <div class="crop-info-item">
+                    <span>适宜湿度:</span>
+                    <strong id="rangeHumidity">60~75%</strong>
+                </div>
+                <div class="crop-divider"></div>
+                <div class="crop-info-item">
+                    <span>适宜土壤水分:</span>
+                    <strong id="rangeSoil">50~70%</strong>
+                </div>
+                <div class="crop-divider"></div>
+                <div class="auto-indicator auto-mode" id="modeIndicator">
+                    <div class="auto-indicator-dot"></div>
+                    <span id="modeIndicatorText">全自动运行中</span>
+                </div>
+            </div>
+
+            <!-- 手动控制区 -->
+            <div class="manual-controls" id="manualControls">
+                <div class="manual-control-group disabled" id="filmControl">
+                    <span class="manual-label">🎬 卷膜控制</span>
+                    <button class="manual-btn" onclick="manualAction('film', 'up')">⬆️ 升起</button>
+                    <button class="manual-btn" onclick="manualAction('film', 'down')">⬇️ 放下</button>
+                    <button class="manual-btn" onclick="manualAction('film', 'stop')">⏹️ 停止</button>
+                </div>
+                <div class="manual-control-group disabled" id="irrigationControl">
+                    <span class="manual-label">🚿 灌溉控制</span>
+                    <button class="manual-btn" onclick="manualAction('irrigation', 'on')">开启灌溉</button>
+                    <button class="manual-btn" onclick="manualAction('irrigation', 'off')">关闭灌溉</button>
+                </div>
+            </div>
+
+            <!-- 语音播报区 -->
+            <div class="voice-panel">
+                <span class="voice-icon" id="voiceIcon">🔊</span>
+                <div class="voice-text">
+                    <span class="latest" id="voiceLatest">系统就绪，正在监控环境数据...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== 底部作物选择栏 ====== -->
+        <nav class="crop-bar">
+            <span class="crop-bar-label">选择作物:</span>
+            <div class="crop-icon-btn" data-crop="pepper" onclick="selectCrop('pepper')">
+                <span class="crop-emoji">🌶️</span>
+                <span class="crop-name">辣椒</span>
+            </div>
+            <div class="crop-icon-btn active" data-crop="tomato" onclick="selectCrop('tomato')">
+                <span class="crop-emoji">🍅</span>
+                <span class="crop-name">番茄</span>
+            </div>
+            <div class="crop-icon-btn" data-crop="cucumber" onclick="selectCrop('cucumber')">
+                <span class="crop-emoji">🥒</span>
+                <span class="crop-name">黄瓜</span>
+            </div>
+            <div class="crop-icon-btn" data-crop="strawberry" onclick="selectCrop('strawberry')">
+                <span class="crop-emoji">🍓</span>
+                <span class="crop-name">草莓</span>
+            </div>
+            <div class="crop-icon-btn" data-crop="eggplant" onclick="selectCrop('eggplant')">
+                <span class="crop-emoji">🍆</span>
+                <span class="crop-name">茄子</span>
+            </div>
+            <div class="crop-icon-btn" data-crop="lettuce" onclick="selectCrop('lettuce')">
+                <span class="crop-emoji">🥬</span>
+                <span class="crop-name">生菜</span>
+            </div>
+        </nav>
+
+        <!-- ====== 底部状态栏 ====== -->
+        <footer class="statusbar">
+            <div class="statusbar-left">
+                <div class="statusbar-item"><span>🔗 传感器: 8/8 在线</span></div>
+                <div class="statusbar-item"><span>📡 网络: 正常</span></div>
+                <div class="statusbar-item"><span>💦 水箱: 78%</span></div>
+                <div class="statusbar-item"><span>🔋 电源: 正常</span></div>
+            </div>
+            <div class="statusbar-right">
+                <span>智慧大棚控制系统 v3.0.0</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Toast 通知 -->
+    <div class="toast" id="toast">
+        <span id="toastIcon">✅</span>
+        <span id="toastText">操作成功</span>
+    </div>
+
+    <script>
+        // ====== 作物预设参数 ======
+        const cropPresets = {
+            pepper:    { name: '辣椒 🌶️',    tempMin: 22, tempMax: 30, humMin: 55, humMax: 75, soilMin: 50, soilMax: 70 },
+            tomato:    { name: '番茄 🍅',    tempMin: 20, tempMax: 30, humMin: 60, humMax: 75, soilMin: 50, soilMax: 70 },
+            cucumber:  { name: '黄瓜 🥒',    tempMin: 18, tempMax: 28, humMin: 70, humMax: 85, soilMin: 60, soilMax: 80 },
+            strawberry:{ name: '草莓 🍓',    tempMin: 15, tempMax: 25, humMin: 60, humMax: 80, soilMin: 55, soilMax: 75 },
+            eggplant:   { name: '茄子 🍆',   tempMin: 22, tempMax: 30, humMin: 60, humMax: 80, soilMin: 55, soilMax: 75 },
+            lettuce:    { name: '生菜 🥬',   tempMin: 12, tempMax: 22, humMin: 65, humMax: 85, soilMin: 60, soilMax: 80 }
+        };
+
+        let currentCrop = 'tomato';
+        let isAutoMode = true;
+
+        // ====== 实时数据 ======
+        let temp = 26.4, humidity = 68.2, soilMoisture = 52.0;
+
+        // ====== 时钟 ======
+        function updateClock() {
+            const now = new Date();
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            const s = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+        }
+        updateClock();
+        setInterval(updateClock, 1000);
+
+        // ====== 语音播报 (Web Speech API) ======
+        const synth = window.speechSynthesis;
+        let voices = [];
+
+        function loadVoices() {
+            voices = synth.getVoices();
+        }
+        loadVoices();
+        if (typeof speechSynthesis !== 'undefined' && speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = loadVoices;
+        }
+
+        function speak(text) {
+            const voiceIcon = document.getElementById('voiceIcon');
+            const voiceLatest = document.getElementById('voiceLatest');
+
+            voiceLatest.textContent = text;
+            voiceIcon.classList.add('speaking');
+
+            if (synth) {
+                synth.cancel();
+                const utter = new SpeechSynthesisUtterance(text);
+                utter.lang = 'zh-CN';
+                utter.rate = 0.9;
+                utter.pitch = 1.1;
+
+                const zhVoice = voices.find(v => v.lang.startsWith('zh'));
+                if (zhVoice) utter.voice = zhVoice;
+
+                utter.onend = () => voiceIcon.classList.remove('speaking');
+                utter.onerror = () => voiceIcon.classList.remove('speaking');
+                synth.speak(utter);
+            } else {
+                setTimeout(() => voiceIcon.classList.remove('speaking'), 2000);
+            }
+        }
+
+        // ====== Toast 通知 ======
+        function showToast(text, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastIcon = document.getElementById('toastIcon');
+            const toastText = document.getElementById('toastText');
+
+            toast.className = 'toast';
+            toast.classList.add(type, 'show');
+
+            const icons = { success: '✅', warn: '⚠️', danger: '🚨' };
+            toastIcon.textContent = icons[type] || '✅';
+            toastText.textContent = text;
+
+            clearTimeout(toast._timer);
+            toast._timer = setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // ====== 状态判定 ======
+        function getStatus(value, min, max) {
+            const range = max - min;
+            const margin = range * 0.15;
+            if (value >= min - margin && value <= max + margin) return 'normal';
+            if (value >= min - margin * 2 && value <= max + margin * 2) return 'warning';
+            return 'danger';
+        }
+
+        function applyGaugeState(gaugeId, statusId, status) {
+            const gauge = document.getElementById(gaugeId);
+            const statusEl = document.getElementById(statusId);
+
+            gauge.className = 'gauge-circle';
+            const statusText = { normal: '正常', warning: '警告', danger: '危险' };
+            const statusClass = { normal: 'status-normal', warning: 'status-warning', danger: 'status-danger' };
+            const gaugeClass = { normal: 'gauge-normal', warning: 'gauge-warning', danger: 'gauge-danger' };
+
+            gauge.classList.add(gaugeClass[status]);
+            statusEl.className = 'gauge-status ' + statusClass[status];
+            statusEl.textContent = statusText[status];
+        }
+
+        // ====== 数据更新 + 自动控制逻辑 ======
+        let lastTempStatus = 'normal';
+        let lastSoilStatus = 'normal';
+
+        function updateData() {
+            const preset = cropPresets[currentCrop];
+
+            // 数据小幅波动
+            temp += (Math.random() - 0.48) * 0.5;
+            temp = Math.max(5, Math.min(45, temp));
+
+            humidity += (Math.random() - 0.5) * 1.0;
+            humidity = Math.max(20, Math.min(98, humidity));
+
+            soilMoisture += (Math.random() - 0.52) * 0.8;
+            soilMoisture = Math.max(10, Math.min(95, soilMoisture));
+
+            // 更新显示
+            document.getElementById('tempValue').textContent = temp.toFixed(1);
+            document.getElementById('humidityValue').textContent = humidity.toFixed(1);
+            document.getElementById('soilValue').textContent = soilMoisture.toFixed(1);
+
+            // 判定状态
+            const tempStatus = getStatus(temp, preset.tempMin, preset.tempMax);
+            const humStatus = getStatus(humidity, preset.humMin, preset.humMax);
+            const soilStatus = getStatus(soilMoisture, preset.soilMin, preset.soilMax);
+
+            applyGaugeState('tempGauge', 'tempStatus', tempStatus);
+            applyGaugeState('humidityGauge', 'humidityStatus', humStatus);
+            applyGaugeState('soilGauge', 'soilStatus', soilStatus);
+
+            // ====== 自动模式: 触发语音播报 ======
+            if (isAutoMode) {
+                // 温度过高
+                if (tempStatus === 'danger' && lastTempStatus !== 'danger') {
+                    speak('棚里太热了，已经帮你开窗了');
+                    showToast('温度过高！自动开启通风', 'danger');
+                    autoControl('ventilation', true);
+                } else if (tempStatus === 'warning' && lastTempStatus === 'normal') {
+                    speak('温度有点高了，注意看看哈');
+                    showToast('温度偏高，已预警', 'warn');
+                }
+
+                // 温度恢复正常
+                if (tempStatus === 'normal' && lastTempStatus === 'danger') {
+                    speak('温度降下来了，窗户关好了');
+                    autoControl('ventilation', false);
+                }
+
+                // 土壤缺水
+                if (soilStatus === 'danger' && lastSoilStatus !== 'danger') {
+                    speak('土干了，开始浇水了');
+                    showToast('土壤缺水！自动开启灌溉', 'danger');
+                    autoControl('irrigation', true);
+                } else if (soilStatus === 'warning' && lastSoilStatus === 'normal') {
+                    speak('土有点干了，该浇水了哦');
+                    showToast('土壤水分偏低', 'warn');
+                }
+
+                // 土壤水分恢复
+                if (soilStatus === 'normal' && lastSoilStatus === 'danger') {
+                    speak('水浇够了，关好了');
+                    autoControl('irrigation', false);
+                }
+
+                // 自动控制: 温度过高自动开窗、遮阳
+                if (tempStatus === 'warning' || tempStatus === 'danger') {
+                    if (temp > preset.tempMax + 3) {
+                        autoControl('shading', true);
+                    }
+                } else {
+                    autoControl('shading', false);
+                }
+
+                // 自动控制: 湿度过高自动通风
+                if (humStatus === 'danger' && humidity > preset.humMax + 5) {
+                    autoControl('ventilation', true);
+                }
+            }
+
+            lastTempStatus = tempStatus;
+            lastSoilStatus = soilStatus;
+        }
+
+        function autoControl(device, on) {
+            // 自动模式下控制设备的逻辑（模拟）
+        }
+
+        // ====== 自动/手动切换 ======
+        function toggleMode() {
+            const sw = document.getElementById('modeSwitch');
+            const labelAuto = document.getElementById('labelAuto');
+            const labelManual = document.getElementById('labelManual');
+            const indicator = document.getElementById('modeIndicator');
+            const indicatorText = document.getElementById('modeIndicatorText');
+            const filmControl = document.getElementById('filmControl');
+            const irrigationControl = document.getElementById('irrigationControl');
+
+            isAutoMode = !isAutoMode;
+
+            if (isAutoMode) {
+                sw.className = 'mode-switch auto';
+                labelAuto.classList.add('active');
+                labelManual.classList.remove('active');
+                indicator.className = 'auto-indicator auto-mode';
+                indicatorText.textContent = '全自动运行中';
+                filmControl.classList.add('disabled');
+                filmControl.classList.remove('enabled');
+                irrigationControl.classList.add('disabled');
+                irrigationControl.classList.remove('enabled');
+                speak('已切换到自动模式，系统全自动运行');
+                showToast('已切换到自动模式，系统将全自动运行');
+            } else {
+                sw.className = 'mode-switch manual';
+                labelAuto.classList.remove('active');
+                labelManual.classList.add('active');
+                indicator.className = 'auto-indicator manual-mode';
+                indicatorText.textContent = '手动操作模式';
+                filmControl.classList.remove('disabled');
+                filmControl.classList.add('enabled');
+                irrigationControl.classList.remove('disabled');
+                irrigationControl.classList.add('enabled');
+                speak('已切换到手动模式，现在可以手动控制了');
+                showToast('已切换到手动模式，可手动控制卷膜和灌溉', 'warn');
+            }
+        }
+
+        // ====== 手动操作 ======
+        function manualAction(device, action) {
+            if (isAutoMode) {
+                showToast('请先切换到手动模式', 'warn');
+                return;
+            }
+
+            const deviceNames = { film: '卷膜', irrigation: '灌溉' };
+            const actionTexts = {
+                'film-up': '卷膜正在升起',
+                'film-down': '卷膜正在放下',
+                'film-stop': '卷膜已停止',
+                'irrigation-on': '灌溉已开启',
+                'irrigation-off': '灌溉已关闭'
+            };
+
+            const key = `${device}-${action}`;
+            const msg = actionTexts[key] || '操作执行';
+            speak(msg);
+            showToast(`${deviceNames[device]}: ${msg}`);
+
+            // 标记按钮激活状态
+            const btns = document.querySelectorAll(`#${device === 'film' ? 'filmControl' : 'irrigationControl'} .manual-btn`);
+            btns.forEach(b => b.classList.remove('active'));
+
+            if (device === 'film') {
+                if (action === 'up') btns[0].classList.add('active');
+                if (action === 'down') btns[1].classList.add('active');
+            } else {
+                if (action === 'on') btns[0].classList.add('active');
+                if (action === 'off') btns[1].classList.add('active');
+            }
+
+            // 灌溉开启时增加土壤水分
+            if (device === 'irrigation' && action === 'on') {
+                const boost = setInterval(() => {
+                    soilMoisture += 0.8;
+                    if (soilMoisture >= 90) clearInterval(boost);
+                }, 1000);
+            }
+        }
+
+        // ====== 作物选择 ======
+        function selectCrop(crop) {
+            currentCrop = crop;
+            const preset = cropPresets[crop];
+
+            // 更新选中状态
+            document.querySelectorAll('.crop-icon-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-crop="${crop}"]`).classList.add('active');
+
+            // 更新信息栏
+            document.getElementById('currentCropName').textContent = preset.name;
+            document.getElementById('rangeTemp').textContent = `${preset.tempMin}~${preset.tempMax}°C`;
+            document.getElementById('rangeHumidity').textContent = `${preset.humMin}~${preset.humMax}%`;
+            document.getElementById('rangeSoil').textContent = `${preset.soilMin}~${preset.soilMax}%`;
+
+            // 语音播报
+            speak(`已切换到${preset.name}，参数已调整`);
+            showToast(`已切换到${preset.name}，适宜参数已自动调整`);
+
+            // 立即更新一次数据状态
+            updateData();
+        }
+
+        // ====== 初始化 ======
+        updateData();
+        setInterval(updateData, 3000);
+
+        // 开机语音
+        setTimeout(() => {
+            speak('智慧大棚系统启动完成，正在监控环境数据');
+        }, 500);
+    </script>
+</body>
+</html>
